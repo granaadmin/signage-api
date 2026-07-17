@@ -1,11 +1,67 @@
 -- =============================================
--- PLAY.O v2 — MIGRATION
--- Adiciona novos conceitos sem quebrar dados existentes
+-- PLAY.O — SCHEMA COMPLETO
 -- =============================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. SPACES (novo conceito central)
+-- TENANTS
+CREATE TABLE IF NOT EXISTS tenants (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_name  VARCHAR(255) NOT NULL,
+  email         VARCHAR(255) UNIQUE NOT NULL,
+  plan          VARCHAR(50) NOT NULL DEFAULT 'free',
+  active        BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- USERS
+CREATE TABLE IF NOT EXISTS users (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  email         VARCHAR(255) UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name          VARCHAR(255) NOT NULL,
+  role          VARCHAR(50) NOT NULL DEFAULT 'admin',
+  active        BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- UNITS
+CREATE TABLE IF NOT EXISTS units (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name          VARCHAR(255) NOT NULL,
+  address       TEXT,
+  active        BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_units_tenant ON units(tenant_id);
+
+-- CONTENTS
+CREATE TABLE IF NOT EXISTS contents (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name          VARCHAR(255) NOT NULL,
+  type          VARCHAR(50),
+  content_type  VARCHAR(50),
+  url           TEXT,
+  file_url      TEXT,
+  duration      INTEGER DEFAULT 10,
+  active        BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_contents_tenant ON contents(tenant_id);
+
+-- SPACES
 CREATE TABLE IF NOT EXISTS spaces (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -21,13 +77,26 @@ CREATE INDEX IF NOT EXISTS idx_spaces_tenant ON spaces(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_spaces_unit ON spaces(unit_id);
 CREATE INDEX IF NOT EXISTS idx_spaces_pairing ON spaces(pairing_code);
 
--- 2. Adicionar space_id nas TVs (mantém compatibilidade)
-ALTER TABLE tvs ADD COLUMN IF NOT EXISTS space_id UUID REFERENCES spaces(id) ON DELETE SET NULL;
-ALTER TABLE tvs ADD COLUMN IF NOT EXISTS device_identifier VARCHAR(255);
+-- TVS
+CREATE TABLE IF NOT EXISTS tvs (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  unit_id           UUID REFERENCES units(id) ON DELETE SET NULL,
+  space_id          UUID REFERENCES spaces(id) ON DELETE SET NULL,
+  name              VARCHAR(255) NOT NULL,
+  device_identifier VARCHAR(255),
+  status            VARCHAR(50) DEFAULT 'offline',
+  last_seen         TIMESTAMPTZ,
+  active            BOOLEAN NOT NULL DEFAULT true,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tvs_tenant ON tvs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tvs_space ON tvs(space_id);
 CREATE INDEX IF NOT EXISTS idx_tvs_device_id ON tvs(device_identifier) WHERE device_identifier IS NOT NULL;
 
--- 3. SPACE_CONTENTS (substitui playlist_items no novo fluxo)
+-- SPACE_CONTENTS
 CREATE TABLE IF NOT EXISTS space_contents (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -42,14 +111,7 @@ CREATE TABLE IF NOT EXISTS space_contents (
 CREATE INDEX IF NOT EXISTS idx_space_contents_space ON space_contents(space_id);
 CREATE INDEX IF NOT EXISTS idx_space_contents_content ON space_contents(content_id);
 
--- 4. Adicionar tipo announcement e file_url nos contents
-ALTER TABLE contents ADD COLUMN IF NOT EXISTS file_url TEXT;
-ALTER TABLE contents ADD COLUMN IF NOT EXISTS content_type VARCHAR(50);
--- content_type: 'video', 'image', 'announcement'
--- Migrar type -> content_type para conteúdos existentes
-UPDATE contents SET content_type = type WHERE content_type IS NULL;
-
--- 5. BRAND SETTINGS
+-- BRAND SETTINGS
 CREATE TABLE IF NOT EXISTS brand_settings (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id         UUID NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
@@ -62,7 +124,7 @@ CREATE TABLE IF NOT EXISTS brand_settings (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 6. ALERTS
+-- ALERTS
 CREATE TABLE IF NOT EXISTS alerts (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -78,7 +140,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_alerts_unresolved ON alerts(tenant_id) WHERE resolved = false;
 
--- 7. ACTIVITY LOGS
+-- ACTIVITY LOGS
 CREATE TABLE IF NOT EXISTS activity_logs (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -89,7 +151,3 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_activity_tenant ON activity_logs(tenant_id, created_at DESC);
-
--- =============================================
--- DONE
--- =============================================
