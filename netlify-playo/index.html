@@ -300,12 +300,15 @@ function toastErr(m){toast(m,'err')}
 async function api(method,path,body,isForm){
   var h={};
   if(token)h['Authorization']='Bearer '+token;
-  var opts={method:method,headers:h};
+  var opts={method:method,headers:h,signal:AbortSignal.timeout(12000)};
   if(body&&!isForm){h['Content-Type']='application/json';opts.body=JSON.stringify(body)}
   else if(body&&isForm){opts.body=body}
   var res;
   try{res=await fetch(API+path,opts)}
-  catch(x){throw new Error('Sem conexao com o servidor.')}
+  catch(x){
+    if(x.name==='TimeoutError'||x.name==='AbortError')throw new Error('Servidor demorou demais. Tente novamente.');
+    throw new Error('Sem conexao com o servidor.');
+  }
   var data=await res.json().catch(function(){return {}});
   if(!res.ok)throw new Error(data.error||'Erro '+res.status);
   return data;

@@ -142,7 +142,7 @@ async function doPair(){
   btn.disabled=true;btn.textContent='Conectando...';
   hideErr();
   try{
-    var res=await fetch(API+'/player/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pairing_code:code})});
+    var res=await fetch(API+'/player/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pairing_code:code}),signal:AbortSignal.timeout(15000)});
     var d=await res.json();
     if(!res.ok)throw new Error(d.error||'Código inválido');
     tvToken=d.token;tvId=d.tv_id;spaceId=d.space_id;
@@ -171,7 +171,7 @@ function startPlayer(){
 async function loadContents(){
   if(!tvToken||!tvId)return;
   try{
-    var res=await fetch(API+'/player/'+tvId+'/contents',{headers:{Authorization:'Bearer '+tvToken}});
+    var res=await fetch(API+'/player/'+tvId+'/contents',{headers:{Authorization:'Bearer '+tvToken},signal:AbortSignal.timeout(15000)});
     if(res.status===401){clearStorage();showPair();return}
     var d=await res.json();
     setOnline(true);

@@ -19,7 +19,7 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 pool.connect()
   .then(c => { console.log('✅ PostgreSQL conectado'); c.release(); })
-  .catch(e => { console.error('❌ DB erro:', e.message); process.exit(1); });
+  .catch(e => { console.error('❌ DB erro:', e.message); });
 
 async function query(text, params) { return pool.query(text, params); }
 
