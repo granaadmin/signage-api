@@ -658,11 +658,14 @@ async function delContent(id,name){
   try{await api('DELETE','/contents/'+id);toast('Conteudo removido');PAGES.contents()}catch(e){toastErr(e.message)}
 }
 
-// MODO TESTE: login simulado, sem autenticação real
+// MODO TESTE: credenciais pré-preenchidas, só clicar em Entrar
 (async function(){
-  me = {name:'Teste Admin',role:'admin',plan:'pro'};
-  token = 'TEST_MODE';
-  enterApp();
+  if(token){try{me=await api('GET','/auth/me');enterApp()}catch(x){localStorage.removeItem('playo_token');token=null}}
+  // Preenche campos de login automaticamente para testes
+  var em=document.getElementById('l-email');
+  var pw=document.getElementById('l-pass');
+  if(em)em.value='teste@playo.com';
+  if(pw)pw.value='teste123';
 })();
 </script>
 </body>
