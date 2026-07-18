@@ -501,9 +501,12 @@ app.get('/api/player/:tvId/contents', requirePlayer, async (req, res) => {
       'SELECT s.name as space_name,u.name as unit_name FROM spaces s JOIN units u ON u.id=s.unit_id WHERE s.id=$1',
       [spaceId]
     );
+    // Brand colors (aplicadas nos slides do tenant)
+    const brand = await query('SELECT primary_color,secondary_color,background_color FROM brand_settings WHERE tenant_id=$1', [req.player.tenant_id]);
     res.json({
       contents: contents.rows,
       space: space.rows[0] || {},
+      brand: brand.rows[0] || {},
       server_time: new Date().toISOString()
     });
   } catch (e) { res.status(500).json({ error: e.message }); }

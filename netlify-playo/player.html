@@ -120,6 +120,7 @@ var tvToken = localStorage.getItem('playo_tv_token');
 var tvId    = localStorage.getItem('playo_tv_id');
 var spaceId = localStorage.getItem('playo_space_id');
 var spaceInfo = {};
+var brandColors = {};
 var playlist = [];
 var idx = 0;
 var activeSlot = 'a';
@@ -176,6 +177,7 @@ async function loadContents(){
     var d=await res.json();
     setOnline(true);
     spaceInfo=d.space||spaceInfo;
+    if(d.brand)brandColors=d.brand;
     lastSync=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     if(!d.contents||!d.contents.length){
       showWait();
@@ -232,6 +234,9 @@ function renderItem(item,slot){
     var td={};
     try{td=typeof item.template_data==='string'?JSON.parse(item.template_data):item.template_data||{}}catch(x){}
     if(td.layout==='slide1'||td.layout==='slide2'){
+      // Cores sempre vindas da Identidade Visual do painel
+      if(brandColors.background_color)td.bg_color=brandColors.background_color;
+      if(brandColors.primary_color)td.primary_color=brandColors.primary_color;
       el.innerHTML='<div style="position:relative;width:100%;height:100%;font-size:1vw">'+renderSlide(td,item.name)+'</div>';
     } else {
       var bg=td.bg_color||'#07070C';

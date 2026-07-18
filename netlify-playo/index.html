@@ -195,6 +195,11 @@ tr:hover td{background:rgba(108,99,255,.03)}
 .fade-up{animation:fadeUp .2s var(--spring) both}
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}}
 @media(max-width:800px){#sidebar{width:52px;min-width:52px}.sb-plan,.nav-section-label,.u-name,.u-role{display:none}.sb-brand{justify-content:center}.user-pill{justify-content:center}}
+/* SLIDE SPACE PICKER */
+.sl-space-list{display:flex;flex-direction:column;gap:6px;max-height:230px;overflow-y:auto}
+.sl-space-row{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--b2);border-radius:10px;cursor:pointer;transition:all .12s}
+.sl-space-row:hover{border-color:var(--b3);background:rgba(255,255,255,.02)}
+.sl-space-row.on{border-color:var(--v);background:var(--v-08,rgba(108,99,255,.08))}
 /* ONBOARDING */
 #onboard-screen{position:fixed;inset:0;background:var(--void);display:none;align-items:center;justify-content:center;z-index:180;padding:32px 20px;overflow-y:auto}
 #onboard-screen::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 50% 25%,rgba(108,99,255,.09),transparent 60%);pointer-events:none}
@@ -600,36 +605,71 @@ PAGES.units=async function(){
   }catch(e){setContent('<div class="empty"><div class="empty-ico">!</div><div class="empty-title">'+e.message+'</div></div>')}
 };
 
+function typeIco(t){return {video:'>',image:'[]',announcement:'#'}[t]||'#'}
+function typeName(t){return {video:'Video',image:'Imagem',announcement:'Slide'}[t]||'Slide'}
 PAGES.contents=async function(){
   clearBtns();addBtn('+ Adicionar conteudo',openAddContent);
   setContent('<div class="spin-wrap"><div class="page-spin"></div></div>');
   try{
     var contents=await api('GET','/contents');
     if(!contents.length){setContent('<div class="empty fade-up"><div class="empty-ico">></div><div class="empty-title">Nenhum conteudo ainda</div><div class="empty-sub">Envie videos, imagens ou crie comunicados.</div><button class="btn btn-primary" onclick="openAddContent()">+ Adicionar conteudo</button></div>');return}
-    var ico=function(t){return {video:'>',image:'[]',announcement:'!'}[t]||'?'};
     var rows=contents.map(function(c){
       var ct=c.content_type||c.type||'video';
       var spaces=c.space_names&&c.space_names.filter(Boolean)||[];
-      return '<div class="cnt-row" data-cid="'+c.id+'" onclick="openDistribute(this.dataset.cid)"><div class="cnt-thumb">'+ico(ct)+'</div><div style="flex:1;min-width:0"><div class="cnt-row-name">'+c.name+'</div><div class="cnt-row-meta">'+ct+(c.duration?' | '+c.duration+'s':'')+(c.file_size?' | '+fmtSize(c.file_size):'')+'</div></div><div style="font-size:11.5px;color:var(--t3);min-width:0;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(spaces.length?spaces.join(', '):'Nenhum espaco')+'</div><button class="btn btn-ghost btn-sm" style="margin-left:8px" data-cid="'+c.id+'" onclick="event.stopPropagation();openDistribute(this.dataset.cid)">Distribuir</button><button class="btn btn-danger btn-sm" style="margin-left:4px" data-cid="'+c.id+'" data-cn="'+c.name+'" onclick="event.stopPropagation();delContent(this.dataset.cid,this.dataset.cn)">x</button></div>';
+      var where=spaces.length?spaces.join(', '):'Nao aparece em nenhum espaco';
+      var whereColor=spaces.length?'var(--t3)':'var(--er)';
+      return '<div class="cnt-row" data-cid="'+c.id+'" onclick="openDistribute(this.dataset.cid)"><div class="cnt-thumb">'+typeIco(ct)+'</div><div style="flex:1;min-width:0"><div class="cnt-row-name">'+c.name+'</div><div class="cnt-row-meta">'+typeName(ct)+(c.duration?' | '+c.duration+'s':'')+(c.file_size?' | '+fmtSize(c.file_size):'')+'</div></div><div style="font-size:11.5px;color:'+whereColor+';min-width:0;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+where+'</div><button class="btn btn-ghost btn-sm" style="margin-left:8px" data-cid="'+c.id+'" onclick="event.stopPropagation();openDistribute(this.dataset.cid)">Distribuir</button><button class="btn btn-danger btn-sm" style="margin-left:4px" data-cid="'+c.id+'" data-cn="'+c.name+'" onclick="event.stopPropagation();delContent(this.dataset.cid,this.dataset.cn)">x</button></div>';
     }).join('');
     setContent('<div class="cnt-rows fade-up">'+rows+'</div>');
   }catch(e){setContent('<div class="empty"><div class="empty-ico">!</div><div class="empty-title">'+e.message+'</div></div>')}
 };
 
+var _brand={};
 PAGES.brand=async function(){
   setContent('<div class="spin-wrap"><div class="page-spin"></div></div>');
   try{
     var b=await api('GET','/brand-settings');
-    setContent('<div class="fade-up" style="max-width:460px"><div class="card"><div class="card-hdr"><span class="card-title">Identidade visual</span></div><div style="padding:18px 20px"><p style="font-size:13px;color:var(--t2);margin-bottom:18px;line-height:1.6">Essas cores sao usadas nos comunicados criados no sistema.</p><div class="field"><label>Cor principal</label><input type="color" id="br-primary" value="'+(b.primary_color||'#6C63FF')+'" style="height:40px;padding:4px"></div><div class="field"><label>Cor secundaria</label><input type="color" id="br-secondary" value="'+(b.secondary_color||'#8B7FFF')+'" style="height:40px;padding:4px"></div><div class="field"><label>Cor de fundo</label><input type="color" id="br-bg" value="'+(b.background_color||'#07070C')+'" style="height:40px;padding:4px"></div><button class="btn btn-primary" onclick="saveBrand()">Salvar</button></div></div></div>');
+    _brand={bg:b.background_color||'#07070C',ac:b.primary_color||'#6C63FF'};
+    setContent('<div class="fade-up" style="max-width:760px">'
+     +'<div class="card"><div class="card-hdr"><span class="card-title">Identidade visual</span></div>'
+     +'<div style="padding:20px">'
+     +'<p style="font-size:13px;color:var(--t2);margin-bottom:20px;line-height:1.6">Defina as cores da sua marca. Elas s&atilde;o aplicadas automaticamente em <b style="color:var(--t1)">todos os slides</b> que voc&ecirc; criar &mdash; inclusive nos que j&aacute; existem.</p>'
+     +'<div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">'
+     +'<div style="width:200px">'
+     +'<div class="field"><label>Cor de fundo</label><div style="display:flex;align-items:center;gap:10px"><input type="color" id="br-bg" value="'+_brand.bg+'" oninput="brandPaint()" style="width:46px;height:34px;border:none;background:none;cursor:pointer;padding:0"><span id="br-bg-hex" style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--t2)">'+_brand.bg+'</span></div></div>'
+     +'<div class="field"><label>Cor de destaque</label><div style="display:flex;align-items:center;gap:10px"><input type="color" id="br-ac" value="'+_brand.ac+'" oninput="brandPaint()" style="width:46px;height:34px;border:none;background:none;cursor:pointer;padding:0"><span id="br-ac-hex" style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--t2)">'+_brand.ac+'</span></div></div>'
+     +'<button class="btn btn-primary" style="margin-top:6px" onclick="saveBrand()">Salvar identidade</button>'
+     +'</div>'
+     +'<div style="flex:1;min-width:300px">'
+     +'<div style="font-size:11.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Como seus slides ficam</div>'
+     +'<div style="display:flex;flex-direction:column;gap:12px">'
+     +'<div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid var(--b2)" id="br-prev1"></div>'
+     +'<div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid var(--b2)" id="br-prev2"></div>'
+     +'</div></div>'
+     +'</div></div></div></div>');
+    brandPaint();
   }catch(e){setContent('<div class="empty"><div class="empty-ico">!</div><div class="empty-title">'+e.message+'</div></div>')}
 };
+function brandPaint(){
+  var bg=document.getElementById('br-bg').value,ac=document.getElementById('br-ac').value;
+  document.getElementById('br-bg-hex').textContent=bg;
+  document.getElementById('br-ac-hex').textContent=ac;
+  var demo={title:'Semana da Família',body:'De 20 a 24 de julho, programação especial.',subtitle:'Sua marca aqui',bg_color:bg,primary_color:ac};
+  [['br-prev1','slide1'],['br-prev2','slide2']].forEach(function(p){
+    var el=document.getElementById(p[0]);if(!el)return;
+    demo.layout=p[1];
+    el.innerHTML=renderSlide(demo,'');
+    el.style.fontSize=(el.clientWidth/100)+'px';
+  });
+}
 
 async function resolveAlert(id){
   try{await api('PUT','/alerts/'+id+'/resolve',{});PAGES.dashboard()}catch(e){toastErr(e.message)}
 }
 async function saveBrand(){
-  var d={primary_color:document.getElementById('br-primary').value,secondary_color:document.getElementById('br-secondary').value,background_color:document.getElementById('br-bg').value};
-  try{await api('PUT','/brand-settings',d);toast('Identidade visual salva!')}catch(e){toastErr(e.message)}
+  var ac=document.getElementById('br-ac').value,bg=document.getElementById('br-bg').value;
+  var d={primary_color:ac,secondary_color:ac,background_color:bg};
+  try{await api('PUT','/brand-settings',d);toast('Identidade visual salva! Todos os slides ja usam essas cores.')}catch(e){toastErr(e.message)}
 }
 
 var _uform={};
@@ -679,10 +719,9 @@ async function loadSpaceContents(sid){
   try{
     var items=await api('GET','/spaces/'+sid+'/contents');
     if(!items.length){el.innerHTML='<div style="font-size:11.5px;color:var(--t3);padding:4px 0">Sem conteudo. Clique em "+ Conteudo" para adicionar.</div>';return}
-    var ico=function(t){return {video:'>',image:'[]',announcement:'!'}[t]||'?'};
     el.innerHTML='<div class="space-cnt-list">'+items.map(function(c,i){
       var ct=c.content_type||c.type;
-      return '<div class="space-cnt-row"><span style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--t3);width:14px">'+(i+1)+'</span><div class="space-cnt-thumb">'+ico(ct)+'</div><div class="space-cnt-name">'+c.name+'</div><span style="font-size:10.5px;color:var(--t3)">'+(c.duration||'?')+'s</span><button class="btn btn-danger btn-sm" data-sid="'+sid+'" data-cid="'+c.id+'" onclick="removeFromSpace(this.dataset.sid,this.dataset.cid)">x</button></div>';
+      return '<div class="space-cnt-row"><span style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--t3);width:14px">'+(i+1)+'</span><div class="space-cnt-thumb">'+typeIco(ct)+'</div><div class="space-cnt-name">'+c.name+'</div><span style="font-size:10.5px;color:var(--t3)">'+(c.duration||'?')+'s</span><button class="btn btn-danger btn-sm" data-sid="'+sid+'" data-cid="'+c.id+'" onclick="removeFromSpace(this.dataset.sid,this.dataset.cid)">x</button></div>';
     }).join('')+'</div>';
   }catch(x){}
 }
@@ -738,7 +777,7 @@ async function removeFromSpace(spaceId,contentId){
 }
 
 function openAddContent(){
-  var html='<div style="display:flex;flex-direction:column;gap:10px"><button class="btn btn-ghost btn-full" style="height:52px;font-size:13.5px" onclick="closeModal();openUpload()">Enviar video ou imagem</button><button class="btn btn-ghost btn-full" style="height:52px;font-size:13.5px" onclick="closeModal();openSlideCreator()">Criar slide</button><button class="btn btn-ghost btn-full" style="height:52px;font-size:13.5px" onclick="closeModal();openAnnouncement()">Criar comunicado</button></div><div class="modal-footer" style="border:none;padding-top:8px"><button class="btn btn-ghost btn-full" onclick="closeModal()">Cancelar</button></div>';
+  var html='<div style="display:flex;flex-direction:column;gap:10px"><button class="btn btn-ghost btn-full" style="height:52px;font-size:13.5px" onclick="closeModal();openSlideCreator()">Criar slide</button><button class="btn btn-ghost btn-full" style="height:52px;font-size:13.5px" onclick="closeModal();openUpload()">Enviar video ou imagem</button></div><div class="modal-footer" style="border:none;padding-top:8px"><button class="btn btn-ghost btn-full" onclick="closeModal()">Cancelar</button></div>';
   openModal('Adicionar conteudo',html,'Escolha o tipo:');
 }
 
@@ -847,32 +886,27 @@ async function openSlideCreator(){
   var spaces,brand;
   try{spaces=await api('GET','/spaces')}catch(x){spaces=[]}
   try{brand=await api('GET','/brand-settings')}catch(x){brand={}}
-  var unitGroups={};
-  spaces.forEach(function(s){if(!unitGroups[s.unit_name])unitGroups[s.unit_name]=[];unitGroups[s.unit_name].push(s)});
-  var spaceChecks=Object.entries(unitGroups).map(function(entry){
-    var uname=entry[0],ss=entry[1];
-    return '<div class="space-check-group"><div class="space-check-unit">'+uname+'</div>'+ss.map(function(s){return '<label class="space-check-pill"><input type="checkbox" id="sl-chk-'+s.id+'" value="'+s.id+'" style="accent-color:var(--v)"> '+s.name+'</label>'}).join('')+'</div>';
+  _sform={layout:'slide1',bg:brand.background_color||'#07070C',ac:brand.primary_color||'#6C63FF',spaces:{}};
+  var spaceRows=spaces.map(function(s){
+    return '<label class="sl-space-row" id="sl-sprow-'+s.id+'" onclick="setTimeout(sldCount,0)"><input type="checkbox" id="sl-chk-'+s.id+'" value="'+s.id+'" style="accent-color:var(--v);width:16px;height:16px"><div style="flex:1"><div style="font-size:13px;color:var(--t1)">'+s.name+'</div><div style="font-size:11px;color:var(--t3)">'+(s.unit_name||'')+'</div></div></label>';
   }).join('');
-  _sform={layout:'slide1',bg:brand.background_color||'#07070C',ac:brand.primary_color||'#6C63FF'};
   var html=''
-   +'<div class="field"><label>Nome interno</label><input id="sl-nome" placeholder="Ex: Aviso da semana"></div>'
-   +'<div class="field"><label>Modelo</label><div style="display:flex;gap:10px">'
-   +'<div id="sl-m1" onclick="sldModel(\'slide1\')" style="flex:1;cursor:pointer;border-radius:10px;border:2px solid var(--v);overflow:hidden"><div style="position:relative;aspect-ratio:16/9" id="sl-mini1"></div><div style="font-size:11.5px;text-align:center;padding:6px;color:var(--t2)">Cl&aacute;ssico &mdash; rodap&eacute; cheio</div></div>'
-   +'<div id="sl-m2" onclick="sldModel(\'slide2\')" style="flex:1;cursor:pointer;border-radius:10px;border:2px solid var(--b2);overflow:hidden"><div style="position:relative;aspect-ratio:16/9" id="sl-mini2"></div><div style="font-size:11.5px;text-align:center;padding:6px;color:var(--t2)">Faixa &mdash; lateral marcada</div></div>'
-   +'</div></div>'
+   +'<div class="field"><label>Nome interno (s&oacute; voc&ecirc; v&ecirc;)</label><input id="sl-nome" placeholder="Ex: Aviso da semana"></div>'
+   +'<div class="field"><label>Escolha o modelo</label><div style="display:flex;gap:10px">'
+   +'<div id="sl-m1" onclick="sldModel(\'slide1\')" style="flex:1;cursor:pointer;border-radius:10px;border:2px solid var(--v);overflow:hidden"><div style="position:relative;aspect-ratio:16/9" id="sl-mini1"></div><div style="font-size:11.5px;text-align:center;padding:6px;color:var(--t2)">Cl&aacute;ssico</div></div>'
+   +'<div id="sl-m2" onclick="sldModel(\'slide2\')" style="flex:1;cursor:pointer;border-radius:10px;border:2px solid var(--b2);overflow:hidden"><div style="position:relative;aspect-ratio:16/9" id="sl-mini2"></div><div style="font-size:11.5px;text-align:center;padding:6px;color:var(--t2)">Faixa</div></div>'
+   +'</div><div style="font-size:11.5px;color:var(--t3);margin-top:8px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:'+_sform.ac+'"></span> As cores v&ecirc;m da <b style="color:var(--t2);font-weight:500">Identidade visual</b>. <span onclick="closeModal();go(\'brand\')" style="color:var(--v);cursor:pointer">Alterar</span></div></div>'
    +'<div class="field"><label>T&iacute;tulo</label><input id="sl-titulo" placeholder="Ex: Semana da Fam&iacute;lia" oninput="sldPaint()"></div>'
    +'<div class="field"><label>Texto (opcional)</label><textarea id="sl-corpo" placeholder="Ex: De 20 a 24 de julho, programa&ccedil;&atilde;o especial." oninput="sldPaint()"></textarea></div>'
    +'<div class="field"><label>Rodap&eacute; / destaque (opcional)</label><input id="sl-sub" placeholder="Ex: Coordena&ccedil;&atilde;o Pedag&oacute;gica" oninput="sldPaint()"></div>'
-   +'<div class="field"><label>Cores</label><div style="display:flex;gap:14px">'
-   +'<label style="flex:1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--t2)">Fundo <input type="color" id="sl-bg" value="'+_sform.bg+'" oninput="sldPaint()" style="width:44px;height:30px;border:none;background:none;cursor:pointer"></label>'
-   +'<label style="flex:1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--t2)">Destaque <input type="color" id="sl-ac" value="'+_sform.ac+'" oninput="sldPaint()" style="width:44px;height:30px;border:none;background:none;cursor:pointer"></label>'
-   +'</div></div>'
    +'<div class="field"><label>Pr&eacute;via</label><div id="sl-prev" style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid var(--b2)"></div></div>'
-   +'<div class="field"><label>Dura&ccedil;&atilde;o (segundos)</label><input id="sl-dur" type="number" value="15"></div>'
-   +(spaces.length?'<div class="field"><label>Publicar nos espacos</label><div class="space-checks">'+spaceChecks+'</div></div>':'')
+   +'<div class="field"><label>Dura&ccedil;&atilde;o na tela (segundos)</label><input id="sl-dur" type="number" value="15"></div>'
+   +(spaces.length
+       ? '<div class="field"><label>Onde vai aparecer <span id="sl-count" style="color:var(--t3);font-weight:400"></span></label><div class="sl-space-list">'+spaceRows+'</div></div>'
+       : '<div class="hint">Voc&ecirc; ainda n&atilde;o tem espa&ccedil;os. O slide ser&aacute; criado e voc&ecirc; pode distribu&iacute;-lo depois.</div>')
    +'<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="createSlide()">Criar e publicar</button></div>';
   openModal('Criar slide',html,'',true);
-  sldPaint();
+  sldPaint();sldCount();
 }
 function sldModel(m){
   _sform.layout=m;
@@ -880,14 +914,22 @@ function sldModel(m){
   document.getElementById('sl-m2').style.borderColor=m==='slide2'?'var(--v)':'var(--b2)';
   sldPaint();
 }
+function sldCount(){
+  var el=document.getElementById('sl-count');if(!el)return;
+  var n=document.querySelectorAll('[id^="sl-chk-"]:checked').length;
+  document.querySelectorAll('.sl-space-row').forEach(function(r){
+    var c=r.querySelector('input');r.classList.toggle('on',c&&c.checked);
+  });
+  el.textContent=n?'· '+n+' espaço'+(n>1?'s':'')+' selecionado'+(n>1?'s':''):'· nenhum selecionado ainda';
+}
 function sldTd(layout){
   return {
     layout:layout||_sform.layout,
     title:(document.getElementById('sl-titulo')||{value:''}).value||'Seu título aqui',
     body:(document.getElementById('sl-corpo')||{value:''}).value,
     subtitle:(document.getElementById('sl-sub')||{value:''}).value,
-    bg_color:(document.getElementById('sl-bg')||{value:_sform.bg}).value,
-    primary_color:(document.getElementById('sl-ac')||{value:_sform.ac}).value
+    bg_color:_sform.bg,
+    primary_color:_sform.ac
   };
 }
 function sldPaint(){
@@ -907,32 +949,52 @@ async function createSlide(){
   var sub=(document.getElementById('sl-sub')||{value:''}).value.trim();
   var dur=(document.getElementById('sl-dur')||{value:15}).value||15;
   if(!name||!title){toastErr('Preencha o nome e o titulo');return}
-  var td=sldTd();
   var spaceIds=Array.from(document.querySelectorAll('[id^="sl-chk-"]:checked')).map(function(el){return el.value});
   showLoading('Criando slide...');
   try{
-    await api('POST','/contents/announcement',{name:name,title:title,body:body||null,subtitle:sub||null,duration:parseInt(dur),layout:_sform.layout,primary_color:td.primary_color,bg_color:td.bg_color,space_ids:spaceIds});
-    closeModal();toast('Slide criado e publicado!');PAGES.contents();
+    await api('POST','/contents/announcement',{name:name,title:title,body:body||null,subtitle:sub||null,duration:parseInt(dur),layout:_sform.layout,primary_color:_sform.ac,bg_color:_sform.bg,space_ids:spaceIds});
+    closeModal();
+    toast(spaceIds.length?'Slide criado e publicado em '+spaceIds.length+' espaco'+(spaceIds.length>1?'s':'')+'!':'Slide criado! Use "Distribuir" para publica-lo.');
+    PAGES.contents();
   }catch(e){showError(e.message,'openSlideCreator()')}
 }
 
 async function openDistribute(contentId){
-  var spaces;
+  var spaces,content;
   try{spaces=await api('GET','/spaces')}catch(e){toastErr(e.message);return}
-  var unitGroups={};
-  spaces.forEach(function(s){if(!unitGroups[s.unit_name])unitGroups[s.unit_name]=[];unitGroups[s.unit_name].push(s)});
-  var checks=Object.entries(unitGroups).map(function(entry){
-    var uname=entry[0],ss=entry[1];
-    return '<div class="space-check-group"><div class="space-check-unit">'+uname+'</div>'+ss.map(function(s){return '<label class="space-check-pill"><input type="checkbox" id="dt-chk-'+s.id+'" value="'+s.id+'" style="accent-color:var(--v)"> '+s.name+'</label>'}).join('')+'</div>';
+  // Marca os espacos onde o conteudo ja aparece
+  var already={};
+  try{
+    var cs=await api('GET','/contents');
+    var c=cs.filter(function(x){return x.id===contentId})[0];
+    (c&&c.space_names||[]).filter(Boolean).forEach(function(n){already[n]=true});
+  }catch(x){}
+  if(!spaces.length){
+    openModal('Distribuir slide','<div class="hint">Voc&ecirc; ainda n&atilde;o tem espa&ccedil;os. Crie uma unidade e um espa&ccedil;o primeiro.</div><div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Fechar</button><button class="btn btn-primary" onclick="closeModal();go(\'units\')">Ir para Unidades</button></div>','',true);
+    return;
+  }
+  var rows=spaces.map(function(s){
+    var on=already[s.name];
+    return '<label class="sl-space-row'+(on?' on':'')+'" id="dt-sprow-'+s.id+'" onclick="setTimeout(dtCount,0)"><input type="checkbox" id="dt-chk-'+s.id+'" value="'+s.id+'"'+(on?' checked':'')+' style="accent-color:var(--v);width:16px;height:16px"><div style="flex:1"><div style="font-size:13px;color:var(--t1)">'+s.name+'</div><div style="font-size:11px;color:var(--t3)">'+(s.unit_name||'')+(on?' · já aparece aqui':'')+'</div></div></label>';
   }).join('');
-  var html=(spaces.length?'<div class="field"><label>Escolha os espacos</label><div class="space-checks">'+checks+'</div></div>':'<div style="color:var(--t3);font-size:13px">Crie espacos primeiro.</div>')+'<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" data-cid="'+contentId+'" onclick="distributeContent(this.dataset.cid)">Distribuir</button></div>';
-  openModal('Distribuir conteudo',html,'Escolha onde vai aparecer:',true);
+  var html='<div class="field"><label>Em quais espa&ccedil;os este slide deve aparecer? <span id="dt-count" style="color:var(--t3);font-weight:400"></span></label><div class="sl-space-list">'+rows+'</div></div>'
+    +'<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" data-cid="'+contentId+'" onclick="distributeContent(this.dataset.cid)">Salvar</button></div>';
+  openModal('Distribuir slide',html,'',true);
+  dtCount();
+}
+function dtCount(){
+  var el=document.getElementById('dt-count');if(!el)return;
+  document.querySelectorAll('[id^="dt-sprow-"]').forEach(function(r){
+    var c=r.querySelector('input');r.classList.toggle('on',c&&c.checked);
+  });
+  var n=document.querySelectorAll('[id^="dt-chk-"]:checked').length;
+  el.textContent=n?'· '+n+' selecionado'+(n>1?'s':''):'· nenhum';
 }
 async function distributeContent(cid){
   var ids=Array.from(document.querySelectorAll('[id^="dt-chk-"]:checked')).map(function(el){return el.value});
   if(!ids.length){toastErr('Selecione pelo menos um espaco');return}
-  showLoading('Distribuindo...');
-  try{await api('POST','/contents/'+cid+'/distribute',{space_ids:ids});closeModal();toast('Conteudo distribuido!');PAGES.contents()}catch(e){showError(e.message)}
+  showLoading('Salvando...');
+  try{await api('POST','/contents/'+cid+'/distribute',{space_ids:ids});closeModal();toast('Slide publicado em '+ids.length+' espaco'+(ids.length>1?'s':'')+'!');PAGES.contents()}catch(e){showError(e.message)}
 }
 async function delContent(id,name){
   if(!confirm('Remover "'+name+'"?'))return;
