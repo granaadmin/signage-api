@@ -17,7 +17,7 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 
 // ── DB ────────────────────────────────────────────────────────────────────────
 console.log('DATABASE_URL set:', !!process.env.DATABASE_URL);
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 pool.connect()
   .then(c => { console.log('✅ PostgreSQL conectado'); c.release(); })
   .catch(e => { console.error('❌ DB erro:', e.message, e.code); });
