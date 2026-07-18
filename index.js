@@ -16,10 +16,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'playo-secret-2025';
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 
 // ── DB ────────────────────────────────────────────────────────────────────────
+console.log('DATABASE_URL set:', !!process.env.DATABASE_URL);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 pool.connect()
   .then(c => { console.log('✅ PostgreSQL conectado'); c.release(); })
-  .catch(e => { console.error('❌ DB erro:', e.message); });
+  .catch(e => { console.error('❌ DB erro:', e.message, e.code); });
 
 async function query(text, params) { return pool.query(text, params); }
 
@@ -164,7 +165,7 @@ app.post('/api/auth/login', async (req, res) => {
     await query('UPDATE users SET last_login_at=NOW() WHERE id=$1', [u.id]);
     const token = signToken({ sub: u.id, tenant_id: u.tenant_id, role: u.role, type: 'user' });
     res.json({ token, user: { id: u.id, email: u.email, name: u.name, role: u.role, company_name: u.company_name, plan: u.plan } });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('LOGIN ERR:', e); res.status(500).json({ error: e.message || e.toString() || 'erro desconhecido' }); }
 });
 
 app.get('/api/auth/me', requireUser, async (req, res) => {
