@@ -195,6 +195,36 @@ tr:hover td{background:rgba(108,99,255,.03)}
 .fade-up{animation:fadeUp .2s var(--spring) both}
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}}
 @media(max-width:800px){#sidebar{width:52px;min-width:52px}.sb-plan,.nav-section-label,.u-name,.u-role{display:none}.sb-brand{justify-content:center}.user-pill{justify-content:center}}
+/* ONBOARDING */
+#onboard-screen{position:fixed;inset:0;background:var(--void);display:none;align-items:center;justify-content:center;z-index:180;padding:32px 20px;overflow-y:auto}
+#onboard-screen::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 50% 25%,rgba(108,99,255,.09),transparent 60%);pointer-events:none}
+.ob-wrap{width:520px;max-width:100%;position:relative;z-index:1;text-align:center}
+.ob-logo{margin-bottom:36px}
+.ob-logo img{height:34px;width:auto;filter:drop-shadow(0 0 20px rgba(108,99,255,.25))}
+.ob-stepnum{font-size:11.5px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--v);margin-bottom:14px}
+.ob-title{font-size:30px;font-weight:700;color:var(--t1);line-height:1.2;margin-bottom:12px}
+.ob-sub{font-size:14.5px;color:var(--t2);line-height:1.65;margin-bottom:32px;max-width:420px;margin-left:auto;margin-right:auto}
+.ob-card{background:var(--d2,rgba(255,255,255,.03));border:1px solid var(--b2);border-radius:14px;padding:26px;text-align:left;margin-bottom:22px}
+.ob-actions{display:flex;flex-direction:column;gap:10px;align-items:center}
+.ob-actions .btn{min-width:240px}
+.ob-skip{background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:inherit;padding:8px;transition:color .15s}
+.ob-skip:hover{color:var(--t2)}
+.ob-dots{display:flex;gap:8px;justify-content:center;margin-top:40px}
+.ob-dot{width:7px;height:7px;border-radius:50%;background:var(--b3,rgba(255,255,255,.11));transition:all .25s}
+.ob-dot.on{background:var(--v);box-shadow:0 0 10px rgba(108,99,255,.5)}
+.ob-dot.done{background:var(--v);opacity:.45}
+.ob-code{font-family:'Courier New',monospace;font-size:44px;font-weight:700;letter-spacing:14px;color:var(--v);background:var(--v-08,rgba(108,99,255,.08));border:2px solid var(--v-20,rgba(108,99,255,.2));border-radius:14px;padding:22px 12px;text-align:center;margin:6px 0 18px}
+.ob-inst{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--b1,rgba(255,255,255,.05))}
+.ob-inst:last-child{border-bottom:none}
+.ob-inst-num{width:22px;height:22px;border-radius:50%;background:var(--v-12,rgba(108,99,255,.12));color:var(--v);font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.ob-inst-txt{font-size:13.5px;color:var(--t2);line-height:1.55;text-align:left}
+.ob-inst-txt b{color:var(--t1);font-weight:500}
+.ob-check{font-size:15px;color:var(--t1);display:flex;align-items:center;gap:10px;padding:9px 0;text-align:left}
+.ob-check .ck{color:var(--ok,#4ADE80);font-weight:700}
+.ob-testbadge{position:fixed;top:14px;right:16px;z-index:200;background:rgba(255,180,0,.12);border:1px solid rgba(255,180,0,.3);color:#FFC94D;font-size:11.5px;font-weight:600;padding:7px 12px;border-radius:8px;display:flex;gap:12px;align-items:center}
+.ob-testbadge button{background:none;border:none;color:#FFC94D;text-decoration:underline;cursor:pointer;font-size:11.5px;font-family:inherit;padding:0}
+.ob-fade{animation:obFade .45s ease both}
+@keyframes obFade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -221,6 +251,10 @@ tr:hover td{background:rgba(108,99,255,.03)}
       </div>
     </div>
   </div>
+</div>
+
+<div id="onboard-screen">
+  <div class="ob-wrap" id="ob-body"></div>
 </div>
 
 <div id="app" style="display:none">
@@ -378,15 +412,146 @@ function doLogout(){
   document.getElementById('auth-screen').style.display='flex';
 }
 
-function enterApp(){
+// MODO TESTE do onboarding: sempre mostra e nunca grava (site vermillion ou ?onboarding=1)
+var OB_TEST=location.hostname.indexOf('vermillion')===0||/[?&]onboarding=1/.test(location.search);
+
+async function enterApp(){
   document.getElementById('auth-screen').style.display='none';
-  document.getElementById('app').style.display='flex';
   document.getElementById('u-name').textContent=me&&me.name||'';
   document.getElementById('u-role').textContent=me&&me.role||'';
   document.getElementById('u-av').textContent=initials(me&&me.name);
   document.getElementById('co-plan').textContent=((me&&me.plan)||'starter').toUpperCase();
+  if(OB_TEST){obStart(true);return}
+  try{
+    var us=await api('GET','/units');
+    if(!us.length){obStart(false);return}
+  }catch(e){}
+  openPanel();
+}
+
+function openPanel(){
+  document.getElementById('onboard-screen').style.display='none';
+  var tb=document.getElementById('ob-testbadge');if(tb)tb.remove();
+  document.getElementById('app').style.display='flex';
   go('dashboard');
 }
+
+// ── ONBOARDING ────────────────────────────────────────────────────────────────
+var OB={sim:false,step:0,unit:null,space:null,content:null};
+
+function obStart(sim){
+  OB={sim:sim,step:0,unit:null,space:null,content:null};
+  document.getElementById('app').style.display='none';
+  document.getElementById('onboard-screen').style.display='flex';
+  if(sim&&!document.getElementById('ob-testbadge')){
+    var b=document.createElement('div');b.id='ob-testbadge';b.className='ob-testbadge';
+    b.innerHTML='MODO TESTE — nada &eacute; salvo <button onclick="obStart(true)">Reiniciar</button>';
+    document.body.appendChild(b);
+  }
+  obRender();
+}
+
+function obDots(){
+  var h='<div class="ob-dots">';
+  for(var i=1;i<=4;i++){h+='<div class="ob-dot '+(OB.step===i?'on':(OB.step>i?'done':''))+'"></div>'}
+  return h+'</div>';
+}
+
+function obLogo(){return '<div class="ob-logo"><img src="'+document.querySelector('.auth-logo img').src+'" alt="PLAY.O"></div>'}
+
+function obRender(){
+  var el=document.getElementById('ob-body'),h='';
+  if(OB.step===0){
+    h=obLogo()+'<div class="ob-title ob-fade">Bem-vindo ao PLAY.O, '+((me&&me.name)||'').split(' ')[0]+'!</div>'
+     +'<div class="ob-sub ob-fade">Vamos colocar sua primeira TV no ar em 4 passos simples. Leva menos de 2 minutos.</div>'
+     +'<div class="ob-actions ob-fade"><button class="btn btn-primary" onclick="OB.step=1;obRender()">Come&ccedil;ar</button></div>';
+  }else if(OB.step===1){
+    h=obLogo()+'<div class="ob-stepnum ob-fade">Passo 1 de 4</div>'
+     +'<div class="ob-title ob-fade">Crie sua primeira unidade</div>'
+     +'<div class="ob-sub ob-fade">Unidade &eacute; o local f&iacute;sico onde suas TVs ficam: uma escola, cl&iacute;nica, loja ou filial.</div>'
+     +'<div class="ob-card ob-fade"><div class="field"><label>Nome da unidade</label><input type="text" id="ob-u-name" placeholder="Ex: Unidade Centro" onkeydown="if(event.key===\'Enter\')obUnit()"></div>'
+     +'<div class="field" style="margin-bottom:0"><label>Cidade (opcional)</label><input type="text" id="ob-u-city" placeholder="Ex: S&atilde;o Paulo" onkeydown="if(event.key===\'Enter\')obUnit()"></div></div>'
+     +'<div class="ob-actions ob-fade"><button class="btn btn-primary" id="ob-btn" onclick="obUnit()">Criar unidade</button></div>'+obDots();
+  }else if(OB.step===2){
+    h=obLogo()+'<div class="ob-stepnum ob-fade">Passo 2 de 4</div>'
+     +'<div class="ob-title ob-fade">Agora crie um espa&ccedil;o</div>'
+     +'<div class="ob-sub ob-fade">Espa&ccedil;o &eacute; onde cada TV fica dentro de <b style="color:var(--t1)">'+OB.unit.name+'</b>: recep&ccedil;&atilde;o, p&aacute;tio, refeit&oacute;rio...</div>'
+     +'<div class="ob-card ob-fade"><div class="field" style="margin-bottom:0"><label>Nome do espa&ccedil;o</label><input type="text" id="ob-s-name" placeholder="Ex: Recep&ccedil;&atilde;o" onkeydown="if(event.key===\'Enter\')obSpace()"></div></div>'
+     +'<div class="ob-actions ob-fade"><button class="btn btn-primary" id="ob-btn" onclick="obSpace()">Criar espa&ccedil;o</button></div>'+obDots();
+  }else if(OB.step===3){
+    var purl=location.origin+'/player.html';
+    h=obLogo()+'<div class="ob-stepnum ob-fade">Passo 3 de 4</div>'
+     +'<div class="ob-title ob-fade">Conecte sua TV</div>'
+     +'<div class="ob-sub ob-fade">Use este c&oacute;digo para parear a TV com o espa&ccedil;o <b style="color:var(--t1)">'+OB.space.name+'</b>.</div>'
+     +'<div class="ob-code ob-fade">'+OB.space.pairing_code+'</div>'
+     +'<div class="ob-card ob-fade">'
+     +'<div class="ob-inst"><div class="ob-inst-num">1</div><div class="ob-inst-txt">Na TV (ou em outra aba), abra <b>'+purl+'</b></div></div>'
+     +'<div class="ob-inst"><div class="ob-inst-num">2</div><div class="ob-inst-txt">Digite o c&oacute;digo <b>'+OB.space.pairing_code+'</b></div></div>'
+     +'<div class="ob-inst"><div class="ob-inst-num">3</div><div class="ob-inst-txt">Pronto — a TV fica conectada a este espa&ccedil;o para sempre</div></div>'
+     +'</div>'
+     +'<div class="ob-actions ob-fade"><button class="btn btn-primary" onclick="OB.step=4;obRender()">J&aacute; conectei</button><button class="ob-skip" onclick="OB.step=4;obRender()">Conectar depois</button></div>'+obDots();
+  }else if(OB.step===4){
+    h=obLogo()+'<div class="ob-stepnum ob-fade">Passo 4 de 4</div>'
+     +'<div class="ob-title ob-fade">Adicione o primeiro conte&uacute;do</div>'
+     +'<div class="ob-sub ob-fade">Crie um comunicado r&aacute;pido para aparecer na TV. Depois voc&ecirc; pode enviar v&iacute;deos e imagens pelo painel.</div>'
+     +'<div class="ob-card ob-fade"><div class="field"><label>T&iacute;tulo</label><input type="text" id="ob-c-title" placeholder="Ex: Bem-vindos!" onkeydown="if(event.key===\'Enter\')obContent()"></div>'
+     +'<div class="field" style="margin-bottom:0"><label>Mensagem (opcional)</label><input type="text" id="ob-c-body" placeholder="Ex: Confira as novidades desta semana" onkeydown="if(event.key===\'Enter\')obContent()"></div></div>'
+     +'<div class="ob-actions ob-fade"><button class="btn btn-primary" id="ob-btn" onclick="obContent()">Criar comunicado</button><button class="ob-skip" onclick="OB.step=5;obRender()">Pular</button></div>'+obDots();
+  }else{
+    h=obLogo()+'<div class="ob-title ob-fade">Tudo pronto!</div>'
+     +'<div class="ob-sub ob-fade">Sua estrutura est&aacute; montada. Agora &eacute; s&oacute; gerenciar tudo pelo painel.</div>'
+     +'<div class="ob-card ob-fade">'
+     +'<div class="ob-check"><span class="ck">&#10003;</span> Unidade <b>'+OB.unit.name+'</b> criada</div>'
+     +'<div class="ob-check"><span class="ck">&#10003;</span> Espa&ccedil;o <b>'+OB.space.name+'</b> — c&oacute;digo <b>'+OB.space.pairing_code+'</b></div>'
+     +'<div class="ob-check"><span class="ck">'+(OB.content?'&#10003;':'&#8226;')+'</span> '+(OB.content?'Comunicado <b>'+OB.content.name+'</b> no ar':'Nenhum conte&uacute;do ainda — adicione pelo painel')+'</div>'
+     +'</div>'
+     +'<div class="ob-actions ob-fade"><button class="btn btn-primary" onclick="obFinish()">Abrir painel</button></div>';
+  }
+  el.innerHTML=h;
+  var f=el.querySelector('input');if(f)f.focus();
+}
+
+function obBusy(t){var b=document.getElementById('ob-btn');if(b){b.disabled=true;b.textContent=t}}
+
+async function obUnit(){
+  var name=document.getElementById('ob-u-name').value.trim();
+  var city=document.getElementById('ob-u-city').value.trim();
+  if(!name){document.getElementById('ob-u-name').focus();return}
+  obBusy('Criando...');
+  try{
+    if(OB.sim){await new Promise(function(r){setTimeout(r,500)});OB.unit={id:'sim',name:name,city:city}}
+    else{OB.unit=await api('POST','/units',{name:name,city:city||null})}
+    OB.step=2;obRender();
+  }catch(e){toastErr(e.message);obRender()}
+}
+
+async function obSpace(){
+  var name=document.getElementById('ob-s-name').value.trim();
+  if(!name){document.getElementById('ob-s-name').focus();return}
+  obBusy('Criando...');
+  try{
+    if(OB.sim){
+      await new Promise(function(r){setTimeout(r,500)});
+      var ch='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',c='';for(var i=0;i<6;i++)c+=ch[Math.floor(Math.random()*ch.length)];
+      OB.space={id:'sim',name:name,pairing_code:c};
+    }else{OB.space=await api('POST','/units/'+OB.unit.id+'/spaces',{name:name})}
+    OB.step=3;obRender();
+  }catch(e){toastErr(e.message);obRender()}
+}
+
+async function obContent(){
+  var title=document.getElementById('ob-c-title').value.trim();
+  var body=document.getElementById('ob-c-body').value.trim();
+  if(!title){document.getElementById('ob-c-title').focus();return}
+  obBusy('Criando...');
+  try{
+    if(OB.sim){await new Promise(function(r){setTimeout(r,500)});OB.content={name:title}}
+    else{OB.content=await api('POST','/contents/announcement',{name:title,title:title,body:body||null,space_ids:[OB.space.id]})}
+    OB.step=5;obRender();
+  }catch(e){toastErr(e.message);obRender()}
+}
+
+function obFinish(){openPanel()}
 
 var TITLES={dashboard:'Dashboard',units:'Unidades',contents:'Conteudos',brand:'Identidade visual'};
 function go(p){
