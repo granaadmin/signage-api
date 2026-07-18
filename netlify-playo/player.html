@@ -231,15 +231,57 @@ function renderItem(item,slot){
   } else if(ct==='announcement'){
     var td={};
     try{td=typeof item.template_data==='string'?JSON.parse(item.template_data):item.template_data||{}}catch(x){}
-    var bg=td.bg_color||'#07070C';
-    var color=td.primary_color||'#6C63FF';
-    el.innerHTML='<div class="slot-announce" style="background:'+bg+'"><div class="announce-title" style="color:'+color+'">'+escHtml(td.title||item.name)+'</div>'+(td.body?'<div class="announce-body">'+escHtml(td.body)+'</div>':'')+'</div>';
+    if(td.layout==='slide1'||td.layout==='slide2'){
+      el.innerHTML='<div style="position:relative;width:100%;height:100%;font-size:1vw">'+renderSlide(td,item.name)+'</div>';
+    } else {
+      var bg=td.bg_color||'#07070C';
+      var color=td.primary_color||'#6C63FF';
+      el.innerHTML='<div class="slot-announce" style="background:'+bg+'"><div class="announce-title" style="color:'+color+'">'+escHtml(td.title||item.name)+'</div>'+(td.body?'<div class="announce-body">'+escHtml(td.body)+'</div>':'')+'</div>';
+    }
   } else {
     el.innerHTML='<div style="width:100%;height:100%;background:#050508;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.2)">'+escHtml(item.name)+'</div>';
   }
 }
 
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// Mantenha em sincronia com renderSlide() do index.html
+function slideTextColor(bg){
+  var c=String(bg||'').replace('#','');if(c.length===3)c=c.split('').map(function(x){return x+x}).join('');
+  var r=parseInt(c.substr(0,2),16)||0,g=parseInt(c.substr(2,2),16)||0,b=parseInt(c.substr(4,2),16)||0;
+  return (0.299*r+0.587*g+0.114*b)>150?'#14161C':'#FFFFFF';
+}
+function renderSlide(td,fallbackName){
+  var bg=td.bg_color||'#07070C',ac=td.primary_color||'#6C63FF';
+  var tx=slideTextColor(bg);
+  var sub=tx==='#FFFFFF'?'rgba(255,255,255,.75)':'rgba(20,22,28,.72)';
+  var title=escHtml(td.title||fallbackName||'');
+  var body=td.body?escHtml(td.body):'';
+  var kick=td.subtitle?escHtml(td.subtitle):'';
+  if(td.layout==='slide2'){
+    return '<div style="position:absolute;inset:0;background:'+bg+';overflow:hidden">'
+      +'<div style="position:absolute;top:0;left:0;bottom:0;width:2.2em;background:'+ac+'"></div>'
+      +'<div style="position:absolute;top:6.5em;right:6.5em;width:3em;height:3em;background:'+ac+'"></div>'
+      +'<div style="position:absolute;left:9em;right:9em;top:50%;transform:translateY(-50%)">'
+      +(kick?'<div style="font-size:2.5em;font-weight:600;letter-spacing:.35em;text-transform:uppercase;color:'+ac+';margin-bottom:1em">'+kick+'</div>':'')
+      +'<div style="font-size:7em;font-weight:700;line-height:1.08;color:'+tx+'">'+title+'</div>'
+      +(body?'<div style="font-size:3.3em;font-weight:300;line-height:1.45;color:'+sub+';margin-top:.9em">'+body+'</div>':'')
+      +'</div>'
+      +'<div style="position:absolute;left:2.2em;right:0;bottom:0;height:.55em;background:'+ac+'"></div>'
+      +'</div>';
+  }
+  return '<div style="position:absolute;inset:0;background:'+bg+';overflow:hidden">'
+    +'<div style="position:absolute;top:-14em;right:-14em;width:42em;height:42em;border-radius:50%;background:'+ac+';opacity:.09"></div>'
+    +'<div style="position:absolute;top:6.5em;left:9em;width:7em;height:1.1em;background:'+ac+'"></div>'
+    +'<div style="position:absolute;left:9em;right:9em;top:46%;transform:translateY(-50%)">'
+    +'<div style="font-size:7.5em;font-weight:700;line-height:1.06;color:'+tx+'">'+title+'</div>'
+    +(body?'<div style="font-size:3.4em;font-weight:300;line-height:1.45;color:'+sub+';margin-top:.9em">'+body+'</div>':'')
+    +'</div>'
+    +'<div style="position:absolute;left:0;right:0;bottom:0;height:4.4em;background:'+ac+';display:flex;align-items:center;justify-content:flex-end;padding:0 3em">'
+    +(kick?'<div style="font-size:2.3em;font-weight:500;letter-spacing:.12em;color:'+slideTextColor(ac)+'">'+kick+'</div>':'')
+    +'</div>'
+    +'</div>';
+}
 
 async function heartbeat(){
   if(!tvToken)return;
