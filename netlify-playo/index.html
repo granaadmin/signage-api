@@ -658,8 +658,11 @@ async function delContent(id,name){
   try{await api('DELETE','/contents/'+id);toast('Conteudo removido');PAGES.contents()}catch(e){toastErr(e.message)}
 }
 
+// MODO TESTE: login simulado, sem autenticação real
 (async function(){
-  if(token){try{me=await api('GET','/auth/me');enterApp()}catch(x){localStorage.removeItem('playo_token');token=null}}
+  me = {name:'Teste Admin',role:'admin',plan:'pro'};
+  token = 'TEST_MODE';
+  enterApp();
 })();
 </script>
 </body>
