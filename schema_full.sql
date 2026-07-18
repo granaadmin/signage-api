@@ -1,68 +1,56 @@
 -- =============================================
--- PLAY.O — SCHEMA COMPLETO
+-- PLAY.O — SCHEMA COMPLETO (derivado do index.js)
 -- =============================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+DROP TABLE IF EXISTS activity_logs, alerts, brand_settings, space_contents, tvs, contents, spaces, units, users, tenants CASCADE;
+
 -- TENANTS
-CREATE TABLE IF NOT EXISTS tenants (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  company_name  VARCHAR(255) NOT NULL,
-  email         VARCHAR(255) UNIQUE NOT NULL,
-  plan          VARCHAR(50) NOT NULL DEFAULT 'free',
-  active        BOOLEAN NOT NULL DEFAULT true,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE tenants (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name              VARCHAR(255) NOT NULL,
+  slug              VARCHAR(255) UNIQUE,
+  plan              VARCHAR(50) NOT NULL DEFAULT 'starter',
+  max_units         INTEGER DEFAULT 5,
+  max_tvs_per_unit  INTEGER DEFAULT 10,
+  storage_gb        INTEGER DEFAULT 10,
+  is_active         BOOLEAN NOT NULL DEFAULT true,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- USERS
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   email         VARCHAR(255) UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   name          VARCHAR(255) NOT NULL,
-  role          VARCHAR(50) NOT NULL DEFAULT 'admin',
-  active        BOOLEAN NOT NULL DEFAULT true,
+  role          VARCHAR(50) NOT NULL DEFAULT 'owner',
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  last_login_at TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX idx_users_tenant ON users(tenant_id);
+CREATE INDEX idx_users_email ON users(email);
 
 -- UNITS
-CREATE TABLE IF NOT EXISTS units (
+CREATE TABLE units (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name          VARCHAR(255) NOT NULL,
-  address       TEXT,
-  active        BOOLEAN NOT NULL DEFAULT true,
+  city          VARCHAR(255),
+  description   TEXT,
+  is_active     BOOLEAN NOT NULL DEFAULT true,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_units_tenant ON units(tenant_id);
-
--- CONTENTS
-CREATE TABLE IF NOT EXISTS contents (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  name          VARCHAR(255) NOT NULL,
-  type          VARCHAR(50),
-  content_type  VARCHAR(50),
-  url           TEXT,
-  file_url      TEXT,
-  duration      INTEGER DEFAULT 10,
-  active        BOOLEAN NOT NULL DEFAULT true,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_contents_tenant ON contents(tenant_id);
+CREATE INDEX idx_units_tenant ON units(tenant_id);
 
 -- SPACES
-CREATE TABLE IF NOT EXISTS spaces (
+CREATE TABLE spaces (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   unit_id       UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
@@ -72,32 +60,49 @@ CREATE TABLE IF NOT EXISTS spaces (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX idx_spaces_tenant ON spaces(tenant_id);
+CREATE INDEX idx_spaces_unit ON spaces(unit_id);
+CREATE INDEX idx_spaces_pairing ON spaces(pairing_code);
 
-CREATE INDEX IF NOT EXISTS idx_spaces_tenant ON spaces(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_spaces_unit ON spaces(unit_id);
-CREATE INDEX IF NOT EXISTS idx_spaces_pairing ON spaces(pairing_code);
+-- CONTENTS
+CREATE TABLE contents (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name          VARCHAR(255) NOT NULL,
+  type          VARCHAR(50),
+  content_type  VARCHAR(50),
+  file_path     TEXT,
+  file_url      TEXT,
+  file_size     BIGINT,
+  duration      INTEGER,
+  template_data JSONB,
+  created_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+  is_active     BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_contents_tenant ON contents(tenant_id);
 
 -- TVS
-CREATE TABLE IF NOT EXISTS tvs (
+CREATE TABLE tvs (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id         UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   unit_id           UUID REFERENCES units(id) ON DELETE SET NULL,
   space_id          UUID REFERENCES spaces(id) ON DELETE SET NULL,
   name              VARCHAR(255) NOT NULL,
+  is_paired         BOOLEAN NOT NULL DEFAULT false,
+  token             TEXT,
+  pairing_code      VARCHAR(20),
   device_identifier VARCHAR(255),
-  status            VARCHAR(50) DEFAULT 'offline',
-  last_seen         TIMESTAMPTZ,
-  active            BOOLEAN NOT NULL DEFAULT true,
+  last_seen_at      TIMESTAMPTZ,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX idx_tvs_tenant ON tvs(tenant_id);
+CREATE INDEX idx_tvs_space ON tvs(space_id);
 
-CREATE INDEX IF NOT EXISTS idx_tvs_tenant ON tvs(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_tvs_space ON tvs(space_id);
-CREATE INDEX IF NOT EXISTS idx_tvs_device_id ON tvs(device_identifier) WHERE device_identifier IS NOT NULL;
-
--- SPACE_CONTENTS
-CREATE TABLE IF NOT EXISTS space_contents (
+-- SPACE_CONTENTS (usa "active", não "is_active")
+CREATE TABLE space_contents (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   space_id      UUID NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
@@ -107,12 +112,11 @@ CREATE TABLE IF NOT EXISTS space_contents (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(space_id, content_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_space_contents_space ON space_contents(space_id);
-CREATE INDEX IF NOT EXISTS idx_space_contents_content ON space_contents(content_id);
+CREATE INDEX idx_space_contents_space ON space_contents(space_id);
+CREATE INDEX idx_space_contents_content ON space_contents(content_id);
 
 -- BRAND SETTINGS
-CREATE TABLE IF NOT EXISTS brand_settings (
+CREATE TABLE brand_settings (
   id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id         UUID NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
   logo_url          TEXT,
@@ -125,7 +129,7 @@ CREATE TABLE IF NOT EXISTS brand_settings (
 );
 
 -- ALERTS
-CREATE TABLE IF NOT EXISTS alerts (
+CREATE TABLE alerts (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   type          VARCHAR(50) NOT NULL,
@@ -136,12 +140,10 @@ CREATE TABLE IF NOT EXISTS alerts (
   resolved_at   TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_alerts_unresolved ON alerts(tenant_id) WHERE resolved = false;
+CREATE INDEX idx_alerts_tenant ON alerts(tenant_id, created_at DESC);
 
 -- ACTIVITY LOGS
-CREATE TABLE IF NOT EXISTS activity_logs (
+CREATE TABLE activity_logs (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id     UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   type          VARCHAR(50) NOT NULL,
@@ -149,5 +151,4 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   metadata      JSONB,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX IF NOT EXISTS idx_activity_tenant ON activity_logs(tenant_id, created_at DESC);
+CREATE INDEX idx_activity_tenant ON activity_logs(tenant_id, created_at DESC);
