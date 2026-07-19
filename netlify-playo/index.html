@@ -197,9 +197,12 @@ tr:hover td{background:rgba(108,99,255,.03)}
 @media(max-width:800px){#sidebar{width:52px;min-width:52px}.sb-plan,.nav-section-label,.u-name,.u-role{display:none}.sb-brand{justify-content:center}.user-pill{justify-content:center}}
 /* SLIDE SPACE PICKER */
 .sl-space-list{display:flex;flex-direction:column;gap:6px;max-height:230px;overflow-y:auto}
-.sl-space-row{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--b2);border-radius:10px;cursor:pointer;transition:all .12s}
+.sl-space-row{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--b2);border-radius:10px;cursor:pointer;transition:all .12s;user-select:none}
 .sl-space-row:hover{border-color:var(--b3);background:rgba(255,255,255,.02)}
 .sl-space-row.on{border-color:var(--v);background:var(--v-08,rgba(108,99,255,.08))}
+.sl-space-row input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.sl-check{width:22px;height:22px;border-radius:6px;border:2px solid var(--b3,rgba(255,255,255,.2));display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:800;line-height:1;color:transparent;transition:all .12s}
+.sl-space-row.on .sl-check{background:var(--v);border-color:var(--v);color:#fff}
 /* ONBOARDING */
 #onboard-screen{position:fixed;inset:0;background:var(--void);display:none;align-items:center;justify-content:center;z-index:180;padding:32px 20px;overflow-y:auto}
 #onboard-screen::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 50% 25%,rgba(108,99,255,.09),transparent 60%);pointer-events:none}
@@ -785,15 +788,10 @@ var _cform={};
 async function openUpload(){
   var spaces;
   try{spaces=await api('GET','/spaces')}catch(x){spaces=[]}
-  var unitGroups={};
-  spaces.forEach(function(s){if(!unitGroups[s.unit_name])unitGroups[s.unit_name]=[];unitGroups[s.unit_name].push(s)});
-  var spaceChecks=Object.entries(unitGroups).map(function(entry){
-    var uname=entry[0],ss=entry[1];
-    return '<div class="space-check-group"><div class="space-check-unit">'+uname+'</div>'+ss.map(function(s){return '<label class="space-check-pill"><input type="checkbox" id="sc-chk-'+s.id+'" value="'+s.id+'" style="accent-color:var(--v)"> '+s.name+'</label>'}).join('')+'</div>';
-  }).join('');
   _cform={name:'',dur:''};
-  var html='<div class="field"><label>Nome do conteudo</label><input id="cnt-name" placeholder="Ex: Promocao Junho" oninput="_cform.name=this.value"></div><div class="field"><label>Duracao em segundos (apenas para imagens)</label><input id="cnt-dur" type="number" placeholder="Ex: 15" oninput="_cform.dur=this.value"></div><div class="field"><label>Arquivo — videos: MP4, WebM, MOV | imagens: JPG, PNG, WebP, GIF (max 500 MB)</label><input type="file" id="cnt-file" accept="video/mp4,video/webm,video/quicktime,image/jpeg,image/png,image/webp,image/gif"></div>'+(spaces.length?'<div class="field"><label>Exibir nos espacos (opcional)</label><div class="space-checks">'+spaceChecks+'</div></div>':'')+'<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="uploadContent()">Enviar e publicar</button></div>';
+  var html='<div class="field"><label>Nome do conteudo</label><input id="cnt-name" placeholder="Ex: Promocao Junho" oninput="_cform.name=this.value"></div><div class="field"><label>Duracao em segundos (apenas para imagens)</label><input id="cnt-dur" type="number" placeholder="Ex: 15" oninput="_cform.dur=this.value"></div><div class="field"><label>Arquivo — videos: MP4, WebM, MOV | imagens: JPG, PNG, WebP, GIF (max 500 MB)</label><input type="file" id="cnt-file" accept="video/mp4,video/webm,video/quicktime,image/jpeg,image/png,image/webp,image/gif"></div>'+(spaces.length?'<div class="field"><label>Onde vai aparecer <span id="up-count" style="color:var(--t3);font-weight:400"></span></label>'+spacePicker(spaces,'up')+'</div>':'')+'<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="uploadContent()">Enviar e publicar</button></div>';
   openModal('Enviar video ou imagem',html,'',true);
+  pickerSync('up');
 }
 async function uploadContent(){
   var file=(document.getElementById('cnt-file')||{}).files&&(document.getElementById('cnt-file')||{}).files[0];
@@ -801,7 +799,7 @@ async function uploadContent(){
   var dur=_cform.dur||'';
   if(!name){toastErr('Digite o nome do conteudo');return}
   if(!file){toastErr('Selecione um arquivo');return}
-  var spaceIds=Array.from(document.querySelectorAll('[id^="sc-chk-"]:checked')).map(function(el){return el.value});
+  var spaceIds=pickerIds('up');
   document.getElementById('m-body').innerHTML='<div class="load-screen"><div class="load-ring"></div><div class="load-title">Enviando arquivo...</div><div class="load-sub">'+file.name+' | '+(file.size/1048576).toFixed(1)+' MB</div></div>';
   var fd=new FormData();
   fd.append('file',file);fd.append('name',name);
@@ -881,15 +879,31 @@ function renderSlide(td,fallbackName){
     +'</div>';
 }
 
+// Seletor de espacos reutilizavel (caixinha com check visivel)
+function spacePicker(spaces,prefix,checkedNames){
+  checkedNames=checkedNames||{};
+  return '<div class="sl-space-list">'+spaces.map(function(s){
+    var on=checkedNames[s.name];
+    return '<label class="sl-space-row'+(on?' on':'')+'" onclick="setTimeout(function(){pickerSync(\''+prefix+'\')},0)"><input type="checkbox" id="'+prefix+'-chk-'+s.id+'" value="'+s.id+'"'+(on?' checked':'')+'><span class="sl-check">&#10003;</span><div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--t1)">'+s.name+'</div><div style="font-size:11px;color:var(--t3)">'+(s.unit_name||'')+(on?' · já aparece aqui':'')+'</div></div></label>';
+  }).join('')+'</div>';
+}
+function pickerSync(prefix){
+  var boxes=document.querySelectorAll('[id^="'+prefix+'-chk-"]');
+  var n=0;
+  boxes.forEach(function(c){var row=c.closest('.sl-space-row');if(c.checked)n++;if(row)row.classList.toggle('on',c.checked)});
+  var el=document.getElementById(prefix+'-count');
+  if(el)el.textContent=n?'· '+n+' selecionado'+(n>1?'s':''):'· nenhum';
+}
+function pickerIds(prefix){
+  return Array.from(document.querySelectorAll('[id^="'+prefix+'-chk-"]:checked')).map(function(el){return el.value});
+}
+
 var _sform={};
 async function openSlideCreator(){
   var spaces,brand;
   try{spaces=await api('GET','/spaces')}catch(x){spaces=[]}
   try{brand=await api('GET','/brand-settings')}catch(x){brand={}}
   _sform={layout:'slide1',bg:brand.background_color||'#07070C',ac:brand.primary_color||'#6C63FF',spaces:{}};
-  var spaceRows=spaces.map(function(s){
-    return '<label class="sl-space-row" id="sl-sprow-'+s.id+'" onclick="setTimeout(sldCount,0)"><input type="checkbox" id="sl-chk-'+s.id+'" value="'+s.id+'" style="accent-color:var(--v);width:16px;height:16px"><div style="flex:1"><div style="font-size:13px;color:var(--t1)">'+s.name+'</div><div style="font-size:11px;color:var(--t3)">'+(s.unit_name||'')+'</div></div></label>';
-  }).join('');
   var html=''
    +'<div class="field"><label>Nome interno (s&oacute; voc&ecirc; v&ecirc;)</label><input id="sl-nome" placeholder="Ex: Aviso da semana"></div>'
    +'<div class="field"><label>Escolha o modelo</label><div style="display:flex;gap:10px">'
@@ -902,25 +916,17 @@ async function openSlideCreator(){
    +'<div class="field"><label>Pr&eacute;via</label><div id="sl-prev" style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid var(--b2)"></div></div>'
    +'<div class="field"><label>Dura&ccedil;&atilde;o na tela (segundos)</label><input id="sl-dur" type="number" value="15"></div>'
    +(spaces.length
-       ? '<div class="field"><label>Onde vai aparecer <span id="sl-count" style="color:var(--t3);font-weight:400"></span></label><div class="sl-space-list">'+spaceRows+'</div></div>'
+       ? '<div class="field"><label>Onde vai aparecer <span id="sl-count" style="color:var(--t3);font-weight:400"></span></label>'+spacePicker(spaces,'sl')+'</div>'
        : '<div class="hint">Voc&ecirc; ainda n&atilde;o tem espa&ccedil;os. O slide ser&aacute; criado e voc&ecirc; pode distribu&iacute;-lo depois.</div>')
    +'<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="createSlide()">Criar e publicar</button></div>';
   openModal('Criar slide',html,'',true);
-  sldPaint();sldCount();
+  sldPaint();pickerSync('sl');
 }
 function sldModel(m){
   _sform.layout=m;
   document.getElementById('sl-m1').style.borderColor=m==='slide1'?'var(--v)':'var(--b2)';
   document.getElementById('sl-m2').style.borderColor=m==='slide2'?'var(--v)':'var(--b2)';
   sldPaint();
-}
-function sldCount(){
-  var el=document.getElementById('sl-count');if(!el)return;
-  var n=document.querySelectorAll('[id^="sl-chk-"]:checked').length;
-  document.querySelectorAll('.sl-space-row').forEach(function(r){
-    var c=r.querySelector('input');r.classList.toggle('on',c&&c.checked);
-  });
-  el.textContent=n?'· '+n+' espaço'+(n>1?'s':'')+' selecionado'+(n>1?'s':''):'· nenhum selecionado ainda';
 }
 function sldTd(layout){
   return {
@@ -949,7 +955,7 @@ async function createSlide(){
   var sub=(document.getElementById('sl-sub')||{value:''}).value.trim();
   var dur=(document.getElementById('sl-dur')||{value:15}).value||15;
   if(!name||!title){toastErr('Preencha o nome e o titulo');return}
-  var spaceIds=Array.from(document.querySelectorAll('[id^="sl-chk-"]:checked')).map(function(el){return el.value});
+  var spaceIds=pickerIds('sl');
   showLoading('Criando slide...');
   try{
     await api('POST','/contents/announcement',{name:name,title:title,body:body||null,subtitle:sub||null,duration:parseInt(dur),layout:_sform.layout,primary_color:_sform.ac,bg_color:_sform.bg,space_ids:spaceIds});
@@ -973,25 +979,13 @@ async function openDistribute(contentId){
     openModal('Distribuir slide','<div class="hint">Voc&ecirc; ainda n&atilde;o tem espa&ccedil;os. Crie uma unidade e um espa&ccedil;o primeiro.</div><div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Fechar</button><button class="btn btn-primary" onclick="closeModal();go(\'units\')">Ir para Unidades</button></div>','',true);
     return;
   }
-  var rows=spaces.map(function(s){
-    var on=already[s.name];
-    return '<label class="sl-space-row'+(on?' on':'')+'" id="dt-sprow-'+s.id+'" onclick="setTimeout(dtCount,0)"><input type="checkbox" id="dt-chk-'+s.id+'" value="'+s.id+'"'+(on?' checked':'')+' style="accent-color:var(--v);width:16px;height:16px"><div style="flex:1"><div style="font-size:13px;color:var(--t1)">'+s.name+'</div><div style="font-size:11px;color:var(--t3)">'+(s.unit_name||'')+(on?' · já aparece aqui':'')+'</div></div></label>';
-  }).join('');
-  var html='<div class="field"><label>Em quais espa&ccedil;os este slide deve aparecer? <span id="dt-count" style="color:var(--t3);font-weight:400"></span></label><div class="sl-space-list">'+rows+'</div></div>'
+  var html='<div class="field"><label>Em quais espa&ccedil;os este slide deve aparecer? <span id="dt-count" style="color:var(--t3);font-weight:400"></span></label>'+spacePicker(spaces,'dt',already)+'</div>'
     +'<div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" data-cid="'+contentId+'" onclick="distributeContent(this.dataset.cid)">Salvar</button></div>';
   openModal('Distribuir slide',html,'',true);
-  dtCount();
-}
-function dtCount(){
-  var el=document.getElementById('dt-count');if(!el)return;
-  document.querySelectorAll('[id^="dt-sprow-"]').forEach(function(r){
-    var c=r.querySelector('input');r.classList.toggle('on',c&&c.checked);
-  });
-  var n=document.querySelectorAll('[id^="dt-chk-"]:checked').length;
-  el.textContent=n?'· '+n+' selecionado'+(n>1?'s':''):'· nenhum';
+  pickerSync('dt');
 }
 async function distributeContent(cid){
-  var ids=Array.from(document.querySelectorAll('[id^="dt-chk-"]:checked')).map(function(el){return el.value});
+  var ids=pickerIds('dt');
   if(!ids.length){toastErr('Selecione pelo menos um espaco');return}
   showLoading('Salvando...');
   try{await api('POST','/contents/'+cid+'/distribute',{space_ids:ids});closeModal();toast('Slide publicado em '+ids.length+' espaco'+(ids.length>1?'s':'')+'!');PAGES.contents()}catch(e){showError(e.message)}
